@@ -9,35 +9,53 @@ const API_KEY = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 // Models
-const TEXT_MODEL = 'gemini-3-flash-preview';
+const TEXT_MODEL = 'gemini-3-flash-preview'; // Supports multimodal input
 const IMAGE_MODEL = 'gemini-2.5-flash-image';
 
 export const generateTextResponse = async (
   history: Message[],
   currentPrompt: string,
-  modeModifier: string
+  modeModifier: string,
+  imageBase64?: string
 ): Promise<string> => {
   try {
     const chatHistory = history
-      .filter(m => m.type === MessageType.TEXT)
+      .filter(m => m.type === MessageType.TEXT) // Keep text history
       .map(m => ({
         role: m.role,
         parts: [{ text: m.content }]
       }));
 
-    const fullPrompt = `${modeModifier}\n\nالسؤال: ${currentPrompt}`;
+    const fullPrompt = `${modeModifier}\n\nالسؤال/الموضوع: ${currentPrompt}`;
 
-    // Using generateContent for single turn with context manually managed or use Chat
-    // To keep it stateless and simple for this "no login" architecture, we recreate the chat.
     const chat = ai.chats.create({
       model: TEXT_MODEL,
       config: {
         systemInstruction: INITIAL_SYSTEM_INSTRUCTION,
+        temperature: 0.7, 
+        topK: 40,
+        topP: 0.95,
       },
       history: chatHistory
     });
 
-    const result = await chat.sendMessage({ message: fullPrompt });
+    let messageContent: any = [{ text: fullPrompt }];
+    
+    // If there is an image attached, add it to the message parts
+    if (imageBase64) {
+      // Extract base64 data (remove data:image/png;base64, prefix)
+      const base64Data = imageBase64.split(',')[1];
+      const mimeType = imageBase64.substring(imageBase64.indexOf(':') + 1, imageBase64.indexOf(';'));
+      
+      messageContent.push({
+        inlineData: {
+          mimeType: mimeType,
+          data: base64Data
+        }
+      });
+    }
+
+    const result = await chat.sendMessage({ message: messageContent });
     return result.text || "عذراً، لم أتمكن من توليد إجابة.";
   } catch (error) {
     console.error("Gemini Text Error:", error);
@@ -50,11 +68,10 @@ export const generateImage = async (prompt: string): Promise<string> => {
     const response = await ai.models.generateContent({
       model: IMAGE_MODEL,
       contents: {
-        parts: [{ text: `High quality, academic educational illustration, detailed, clean lines: ${prompt}` }]
+        parts: [{ text: `High quality, academic educational illustration, detailed, clean lines, cinematic lighting, red and black aesthetic accents: ${prompt}` }]
       },
       config: {
         // Nano Banana models don't support responseMimeType/Schema
-        // We rely on the model returning an inlineData part
       }
     });
 

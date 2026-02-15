@@ -3,7 +3,8 @@ export enum AppMode {
   RESEARCH = 'RESEARCH',
   SUMMARY = 'SUMMARY',
   VISUAL = 'VISUAL',
-  MINDMAP = 'MINDMAP'
+  MINDMAP = 'MINDMAP',
+  AL_DUALI = 'AL_DUALI'
 }
 
 export enum MessageType {
